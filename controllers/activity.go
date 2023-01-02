@@ -189,13 +189,20 @@ func Activities(c *fiber.Ctx) error {
 	} else {
 		order = "DESC"
 	}
-
-	sql := fmt.Sprintf("SELECT * FROM activities WHERE user_id = ? AND MATCH(activity_name) AGAINST(? IN NATURAL LANGUAGE MODE) ORDER BY closed_on %s ", order)
-
+	var sql string
 	var activities []models.Activity
-	if err := database.DB.Raw(sql+"LIMIT ? OFFSET ?", userId, search, limit, (start-1)*limit).Scan(&activities).Error; err != nil {
-		println(err.Error())
-		return c.SendStatus(500)
+	if search != "" {
+		sql = fmt.Sprintf("SELECT * FROM activities WHERE user_id = ? AND MATCH(activity_name) AGAINST(? IN NATURAL LANGUAGE MODE) ORDER BY closed_on %s LIMIT ? OFFSET ?", order)
+		if err := database.DB.Raw(sql, userId, search, limit, (start-1)*limit).Scan(&activities).Error; err != nil {
+			println(err.Error())
+			return c.SendStatus(500)
+		}
+	} else {
+		sql = fmt.Sprintf("SELECT * FROM activities WHERE user_id = ? ORDER BY closed_on %s LIMIT ? OFFSET ?", order)
+		if err := database.DB.Raw(sql, userId, limit, (start-1)*limit).Scan(&activities).Error; err != nil {
+			println(err.Error())
+			return c.SendStatus(500)
+		}
 	}
 
 	return c.Status(200).JSON(fiber.Map{
