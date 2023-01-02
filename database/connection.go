@@ -9,7 +9,7 @@ import (
 var DB *gorm.DB
 
 func Connect() {
-	connection, err := gorm.Open(mysql.Open("root:alekochoveko@/Todo"), &gorm.Config{})
+	connection, err := gorm.Open(mysql.Open("root:alekochoveko@/todo-app?parseTime=true"), &gorm.Config{})
 	if err != nil {
 		panic("could not connect to database")
 	}
@@ -18,5 +18,7 @@ func Connect() {
 
 	connection.AutoMigrate(&models.User{})
 	connection.AutoMigrate(&models.Activity{})
+	connection.Exec("ALTER TABLE activities ADD FULLTEXT (activity_name)")
 	connection.AutoMigrate(&models.Label{})
+	connection.Exec("ALTER TABLE labels ADD FULLTEXT (name)")
 }

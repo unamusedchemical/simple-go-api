@@ -8,7 +8,7 @@ import (
 
 func groupBelongsToCurrentUser(userId uint, groupId uint) (bool, error) {
 	var count int64
-	if err := database.DB.Exec("SELECT COUNT(*) FROM activity_collections WHERE id = ? AND user_id=?", groupId, userId).Scan(&count).Error; err != nil {
+	if err := database.DB.Raw("SELECT COUNT(*) FROM labels WHERE id = ? AND user_id=?", groupId, userId).Scan(&count).Error; err != nil {
 		return false, err
 	}
 
@@ -32,7 +32,7 @@ func CreateGroup(c *fiber.Ctx) error {
 		UserId: userId,
 	}
 
-	if err := database.DB.Exec("INSERT INTO activity_collections (group_name, user_id) VALUES (?, ?) ", group.Name, group.UserId).Error; err != nil {
+	if err := database.DB.Exec("INSERT INTO labels (name, user_id) VALUES (?, ?) ", group.Name, group.UserId).Error; err != nil {
 		return c.Status(500).JSON(err.Error())
 	}
 
@@ -51,7 +51,7 @@ func UpdateGroup(c *fiber.Ctx) error {
 	}
 	var group models.Label
 
-	if err := database.DB.Raw("SELECT * FROM activity_collections WHERE id = ? AND user_id = ?", groupId, userId).Scan(&group).Error; err != nil {
+	if err := database.DB.Raw("SELECT * FROM labels WHERE id = ? AND user_id = ?", groupId, userId).Scan(&group).Error; err != nil {
 		return c.Status(500).JSON(err.Error())
 	}
 
@@ -66,7 +66,7 @@ func UpdateGroup(c *fiber.Ctx) error {
 
 	group.Name = data["name"]
 
-	if err := database.DB.Exec("UPDATE activity_collections SET group_name = ? WHERE id = ?", group.Name, group.Id).Error; err != nil {
+	if err := database.DB.Exec("UPDATE labels SET  name = ? WHERE id = ?", group.Name, group.Id).Error; err != nil {
 		return c.Status(500).JSON(err.Error())
 	}
 
@@ -99,7 +99,7 @@ func DeleteGroup(c *fiber.Ctx) error {
 }
 
 func getGroupActivities(userId uint, groupId uint) ([]models.Activity, error) {
-	sql := "SELECT * FROM activities WHERE user_id = ? AND group_id = ?"
+	sql := "SELECT * FROM activities WHERE user_id = ? AND label_id = ?"
 
 	var activities []models.Activity
 	if err := database.DB.Raw(sql, userId, groupId).Scan(&activities).Error; err != nil {
