@@ -3,7 +3,6 @@ package controllers
 import (
 	"awesomeProject/database"
 	"awesomeProject/models"
-	"errors"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
@@ -20,7 +19,7 @@ type UserJSON struct {
 	Password string `json:"-"`
 }
 
-func userExists(email string) (models.User, error) {
+func getUser(email string) (models.User, error) {
 	result, err := database.DB.Query("SELECT * FROM User WHERE Email = ?", email)
 
 	if err != nil {
@@ -38,10 +37,6 @@ func userExists(email string) (models.User, error) {
 		}
 	}
 
-	if user.Id == 0 {
-		return user, errors.New("user does not exist")
-	}
-
 	return user, nil
 }
 
@@ -53,8 +48,11 @@ func Register(c *fiber.Ctx) error {
 		return c.SendStatus(500)
 	}
 
-	_, err := userExists(json.Email)
-	if err == nil {
+	user, err := getUser(json.Email)
+	if err != nil {
+		println(err.Error())
+		c.SendStatus(500)
+	} else if user.Id != 0 {
 		return c.Status(409).JSON(fiber.Map{
 			"message": "user with such email already exists",
 		})
@@ -96,15 +94,16 @@ func Login(c *fiber.Ctx) error {
 		return c.SendStatus(400)
 	}
 
-	user, err := userExists(json.Email)
+	user, err := getUser(json.Email)
 	if err != nil {
-		return c.Status(404).JSON(fiber.Map{
-			"message": err.Error(),
-		})
+		println(err.Error())
+		return c.SendStatus(500)
+	} else if user.Id == 0 {
+		return c.Status(404).JSON("User not found!")
 	}
 
 	if err := bcrypt.CompareHashAndPassword(user.Password, []byte(json.Password)); err != nil {
-		return c.SendStatus(403)
+		return c.Status(403).JSON("Incorrect password!")
 	}
 
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.StandardClaims{
@@ -139,7 +138,6 @@ func GetCurrentUserId(c *fiber.Ctx) (int64, error) {
 	})
 
 	if err != nil {
-		println("hello")
 		return 0, err
 	}
 

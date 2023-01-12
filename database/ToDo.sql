@@ -6,6 +6,8 @@ CREATE TABLE IF NOT EXISTS User
     Password VARCHAR(72)                        NOT NULL
 );
 
+ALTER TABLE User
+    ADD UNIQUE INDEX Email (Email);
 
 CREATE TABLE IF NOT EXISTS ActivityGroup
 (
@@ -35,8 +37,8 @@ CREATE TABLE IF NOT EXISTS Activity
         ON DELETE CASCADE
 );
 
-CREATE INDEX Opened
-ON Activity (OpenedOn);
+ALTER TABLE Activity
+    ADD INDEX Opened (OpenedOn);
 
 ALTER TABLE Activity
-ADD FULLTEXT(Title, Body);
+    ADD FULLTEXT(Title, Body);
