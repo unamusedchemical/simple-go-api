@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS Activity
     UserId   INTEGER     NOT NULL,
     GroupId  INTEGER,
 
+    FULLTEXT KEY (Title, Body),
+
     FOREIGN KEY (UserId) REFERENCES User (Id)
         ON DELETE CASCADE,
 
@@ -39,6 +41,3 @@ CREATE TABLE IF NOT EXISTS Activity
 
 ALTER TABLE Activity
     ADD INDEX Opened (OpenedOn);
-
-ALTER TABLE Activity
-    ADD FULLTEXT(Title, Body);

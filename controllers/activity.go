@@ -13,17 +13,21 @@ import (
 )
 
 type ActivityJSON struct {
-	Id        int64      `json:"id"`
-	Title     string     `json:"title"`
-	Body      string     `json:"body"`
-	ClosedOn  *time.Time `json:"closed_on"`
-	OpenedOn  time.Time  `json:"opened_on"`
-	Due       *time.Time `json:"due"`
-	GroupId   *int64     `json:"group_id"`
-	GroupName *string    `json:"group_name"`
+	Id       int64      `json:"id"`
+	Title    string     `json:"title"`
+	Body     string     `json:"body"`
+	ClosedOn *time.Time `json:"closed_on"`
+	OpenedOn time.Time  `json:"opened_on"`
+	Due      *time.Time `json:"due"`
+	GroupId  *int64     `json:"group_id"`
 }
 
-func (a *ActivityJSON) initJSON(activity models.Activity, groupName sql2.NullString) {
+type ActivityJoinJSON struct {
+	ActivityJSON
+	GroupName *string `json:"group_name"`
+}
+
+func (a *ActivityJoinJSON) initJSON(activity models.Activity, groupName sql2.NullString) {
 	a.Id = activity.Id
 	a.Body = activity.Body
 	a.Title = activity.Title
@@ -72,7 +76,7 @@ func ActivityBelongsToCurrentUser(userId int64, activityId int64) (bool, error) 
 func CreateActivity(c *fiber.Ctx) error {
 	userId, err := GetCurrentUserId(c)
 	if err != nil {
-		return c.SendStatus(401)
+		return c.Status(401).JSON("User is not logged in!")
 	}
 
 	var json ActivityJSON
@@ -82,30 +86,33 @@ func CreateActivity(c *fiber.Ctx) error {
 
 	stmt, err := database.DB.Prepare("INSERT INTO Activity (Title, Body, OpenedOn, Due, UserId, GroupId) VALUES (?, ?, ?, ?, ?, ?)")
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
 	if json.GroupId != nil && *json.GroupId != 0 {
 		belongs, err := GroupBelongsToCurrentUser(userId, int64(*json.GroupId))
-
 		if err != nil {
-			return c.Status(500).JSON(err.Error())
-		}
-
-		if !belongs {
+			println(err.Error())
+			return c.SendStatus(500)
+		} else if !belongs {
 			return c.Status(404).JSON("Cannot add an activity to a group that does not exits!")
 		}
 	}
+
 	json.OpenedOn = time.Now()
 	result, err := stmt.Exec(json.Title, json.Body, json.OpenedOn, json.Due, userId, json.GroupId)
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
 	json.Id, err = result.LastInsertId()
 	if err != nil {
-		c.Status(500).JSON(err.Error())
+		println(err.Error())
+		c.SendStatus(500)
 	}
+	json.ClosedOn = nil
 
 	return c.Status(200).JSON(json)
 }
@@ -114,22 +121,24 @@ func DeleteActivity(c *fiber.Ctx) error {
 	userId, err := GetCurrentUserId(c)
 
 	if err != nil {
-		c.SendStatus(401)
+		c.Status(401).JSON("User is not logged in!")
 	}
 
 	aId, err := c.ParamsInt("id")
 	if err != nil {
-		return c.SendStatus(400)
+		return c.Status(400).JSON(err.Error())
 	}
 
 	stmt, err := database.DB.Prepare("DELETE FROM Activity WHERE Id = ? AND UserId = ?")
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
 	result, err := stmt.Exec(aId, userId)
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
 	affected, _ := result.RowsAffected()
@@ -144,7 +153,7 @@ func UpdateActivity(c *fiber.Ctx) error {
 	userId, err := GetCurrentUserId(c)
 
 	if err != nil {
-		c.SendStatus(401)
+		c.Status(401).JSON("User not logged in!")
 	}
 
 	var json ActivityJSON
@@ -155,7 +164,8 @@ func UpdateActivity(c *fiber.Ctx) error {
 
 	belongs, err := ActivityBelongsToCurrentUser(userId, json.Id)
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	} else if !belongs {
 		return c.Status(404).JSON("Activity does not exist!")
 	}
@@ -164,7 +174,8 @@ func UpdateActivity(c *fiber.Ctx) error {
 		belongs, err := GroupBelongsToCurrentUser(userId, int64(*json.GroupId))
 
 		if err != nil {
-			return c.Status(500).JSON(err.Error())
+			println(err.Error())
+			return c.SendStatus(500)
 		}
 
 		if !belongs {
@@ -172,16 +183,18 @@ func UpdateActivity(c *fiber.Ctx) error {
 		}
 	}
 
-	stmt, err := database.DB.Prepare("UPDATE Activity SET Title = ?, Body = ?, Due = ?")
+	stmt, err := database.DB.Prepare("UPDATE Activity SET Title = ?, Body = ?, Due = ? WHERE Id = ?")
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
-	_, err = stmt.Exec(json.Title, json.Body, json.Due)
+	_, err = stmt.Exec(json.Title, json.Body, json.Due, json.Id)
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
-
+	json.ClosedOn = nil
 	return c.Status(200).JSON(json)
 }
 
@@ -210,25 +223,29 @@ func EditGroupActivity(c *fiber.Ctx) error {
 
 	belongs, err := ActivityBelongsToCurrentUser(userId, activityId)
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	} else if !belongs {
 		return c.Status(404).JSON("Activity does not exist!")
 	}
 
 	belongs, err = GroupBelongsToCurrentUser(userId, groupId)
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	} else if !belongs {
 		return c.Status(404).JSON("Group does not exist!")
 	}
 
 	stmt, err := database.DB.Prepare("UPDATE Activity SET GroupId = ? WHERE Id = ?")
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 	_, err = stmt.Exec(groupId, activityId)
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
 	return c.SendStatus(200)
@@ -250,7 +267,8 @@ func Activities(c *fiber.Ctx) error {
 	var count int64
 	rows, err := database.DB.Query("SELECT COUNT(*) FROM Activity WHERE UserId = ?", userId)
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
 	rows.Next()
@@ -270,7 +288,8 @@ func Activities(c *fiber.Ctx) error {
 	//validate query params
 	start, err := strconv.Atoi(startQ)
 	if err != nil {
-		return c.SendStatus(400)
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
 	if start < 1 {
@@ -282,7 +301,8 @@ func Activities(c *fiber.Ctx) error {
 	//validate query params
 	desc, err := strconv.ParseBool(descQ)
 	if err != nil {
-		return c.SendStatus(400)
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
 	var order string
@@ -298,33 +318,35 @@ func Activities(c *fiber.Ctx) error {
 		WHERE a.UserId = ? `
 
 	if all == "false" {
-		sql += fmt.Sprintf("AND MATCH(a.Title) AGAINST(? IN NATURAL LANGUAGE MODE) ORDER BY a.OpenedOn %s LIMIT ? OFFSET ?", order)
+		sql += fmt.Sprintf("AND MATCH(a.Title, a.Body) AGAINST(? IN NATURAL LANGUAGE MODE) ORDER BY a.OpenedOn %s LIMIT ? OFFSET ?", order)
 		rows, err = database.DB.Query(sql, userId, search, limit, (start-1)*limit)
 	} else {
 		sql += fmt.Sprintf("ORDER BY a.OpenedOn %s LIMIT ? OFFSET ?", order)
 		rows, err = database.DB.Query(sql, userId, limit, (start-1)*limit)
 	}
 
-	defer rows.Close()
-
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
-	var activities []ActivityJSON
+	defer rows.Close()
+
+	var activities []ActivityJoinJSON
 	for rows.Next() {
 		var activity models.Activity
 		var groupName sql2.NullString
 
 		err := rows.Scan(&activity.Id, &activity.Title, &activity.Body, &activity.ClosedOn, &activity.OpenedOn, &activity.Due, &activity.GroupId, &groupName)
 		if err != nil {
-			return c.Status(500).JSON(err.Error())
+			println(err.Error())
+			return c.SendStatus(500)
 		}
 
-		var activityJSON ActivityJSON
-		(&activityJSON).initJSON(activity, groupName)
+		var activityJoinJSON ActivityJoinJSON
+		(&activityJoinJSON).initJSON(activity, groupName)
 
-		activities = append(activities, activityJSON)
+		activities = append(activities, activityJoinJSON)
 	}
 
 	return c.Status(200).JSON(fiber.Map{
@@ -350,18 +372,21 @@ func CloseActivity(c *fiber.Ctx) error {
 	belongs, err := ActivityBelongsToCurrentUser(userId, int64(aId))
 
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	} else if !belongs {
 		return c.Status(403).JSON("Activity does not exist!")
 	}
 
 	stmt, err := database.DB.Prepare("UPDATE Activity SET ClosedOn=NOW() WHERE Id = ? AND UserId = ?")
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 	_, err = stmt.Exec(aId, userId)
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
 	return c.SendStatus(200)

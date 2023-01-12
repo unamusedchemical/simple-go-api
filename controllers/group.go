@@ -36,29 +36,31 @@ func GroupBelongsToCurrentUser(userId int64, groupId int64) (bool, error) {
 func CreateGroup(c *fiber.Ctx) error {
 	userId, err := GetCurrentUserId(c)
 	if err != nil {
-		return c.Status(401).JSON(err.Error())
+		return c.Status(401).JSON("User is not logged in!")
 	}
 
 	var json GroupJSON
 
 	if err := c.BodyParser(&json); err != nil {
-		println(err.Error())
-		c.SendStatus(400)
+		c.Status(400).JSON(err.Error())
 	}
 
 	stmt, err := database.DB.Prepare("INSERT INTO ActivityGroup(Name, UserId) VALUES (?, ?)")
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
 	result, err := stmt.Exec(json.Name, userId)
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
 	json.Id, err = result.LastInsertId()
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	}
 
 	return c.Status(200).JSON(json)
@@ -77,7 +79,8 @@ func UpdateGroup(c *fiber.Ctx) error {
 
 	belongs, err := GroupBelongsToCurrentUser(userId, group.Id)
 	if err != nil {
-		return c.Status(500).JSON(err.Error())
+		println(err.Error())
+		return c.SendStatus(500)
 	} else if !belongs {
 		return c.Status(404).JSON("Group does not exist!")
 	}
@@ -124,14 +127,14 @@ func DeleteGroup(c *fiber.Ctx) error {
 		return c.Status(404).JSON("Group does not exist")
 	}
 
-	return c.Status(200).JSON("success")
+	return c.SendStatus(200)
 }
 
 func GetGroup(c *fiber.Ctx) error {
 	userId, err := GetCurrentUserId(c)
 
 	if err != nil {
-		return c.Status(401).JSON(err.Error())
+		return c.Status(401).JSON("User not found!")
 	}
 
 	groupId, err := c.ParamsInt("id")
@@ -175,8 +178,7 @@ func GetGroups(c *fiber.Ctx) error {
 	userId, err := GetCurrentUserId(c)
 
 	if err != nil {
-		println(err.Error())
-		return c.SendStatus(401)
+		return c.Status(401).JSON("User is not logged in!")
 	}
 
 	sql := `SELECT g.id, g.name, COUNT(a.Id)

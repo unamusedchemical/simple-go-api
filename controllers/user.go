@@ -44,8 +44,7 @@ func Register(c *fiber.Ctx) error {
 	var json UserJSON
 
 	if err := c.BodyParser(&json); err != nil {
-		println(err.Error())
-		return c.SendStatus(500)
+		return c.Status(400).JSON(err.Error())
 	}
 
 	user, err := getUser(json.Email)
@@ -53,9 +52,9 @@ func Register(c *fiber.Ctx) error {
 		println(err.Error())
 		c.SendStatus(500)
 	} else if user.Id != 0 {
-		return c.Status(409).JSON(fiber.Map{
-			"message": "user with such email already exists",
-		})
+		return c.Status(409).JSON(
+			"User with such email already exists!",
+		)
 	}
 
 	password, err := bcrypt.GenerateFromPassword([]byte(json.Password), 14)
@@ -90,8 +89,7 @@ func Login(c *fiber.Ctx) error {
 	var json UserJSON
 
 	if err := c.BodyParser(&json); err != nil {
-		println(err.Error())
-		return c.SendStatus(400)
+		return c.Status(400).JSON(err.Error())
 	}
 
 	user, err := getUser(json.Email)
@@ -112,7 +110,6 @@ func Login(c *fiber.Ctx) error {
 	})
 
 	token, err := claims.SignedString([]byte(SecretKey))
-
 	if err != nil {
 		println(err.Error())
 		return c.SendStatus(500)
@@ -154,7 +151,7 @@ func GetUser(c *fiber.Ctx) error {
 	userId, err := GetCurrentUserId(c)
 
 	if err != nil {
-		return c.Status(401).JSON(fiber.Map{"message": "unauthorised"})
+		return c.Status(401).JSON("User is not logged in!")
 	}
 
 	result, err := database.DB.Query("SELECT Id, Username, Email FROM User WHERE Id = ?", userId)
@@ -181,7 +178,7 @@ func UpdateUser(c *fiber.Ctx) error {
 	userId, err := GetCurrentUserId(c)
 
 	if err != nil {
-		return c.SendStatus(401)
+		return c.Status(401).JSON("User is not logged in!")
 	}
 
 	var json UserJSON
@@ -190,7 +187,7 @@ func UpdateUser(c *fiber.Ctx) error {
 	}
 
 	if userId != json.Id {
-		return c.Status(403).JSON("cannot update another user")
+		return c.Status(403).JSON("Cannot update another user!")
 	}
 
 	password, _ := bcrypt.GenerateFromPassword([]byte(json.Password), 14)
@@ -218,7 +215,7 @@ func DeleteUser(c *fiber.Ctx) error {
 	userId, err := GetCurrentUserId(c)
 
 	if err != nil {
-		return c.SendStatus(401)
+		return c.Status(401).JSON("User is not logged in!")
 	}
 
 	stmt, err := database.DB.Prepare("DELETE FROM User WHERE Id = ?")

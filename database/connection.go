@@ -11,21 +11,24 @@ import (
 var DB *sql.DB
 
 func Connect() {
+	// load environmental variables from .env file
 	err := godotenv.Load(".env")
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
-
+	// get database credentials from environmental variables
 	dbUser := os.Getenv("DB_USER")
 	dbPass := os.Getenv("DB_PASS")
 	dbName := os.Getenv("DB_NAME")
 
+	// init connection to database
 	connection, err := sql.Open("mysql", dbUser+":"+dbPass+"@/"+dbName+"?parseTime=true")
 	if err != nil {
 		panic("could not connect to database")
 	}
 	DB = connection
 
+	// init database tables
 	DB.Exec(`
 		CREATE TABLE IF NOT EXISTS User
 		(
@@ -65,7 +68,7 @@ func Connect() {
 			UserId   INTEGER     NOT NULL,
 			GroupId  INTEGER,
 			
-		    FULLTEXT KEY (Title, Body)
+		    FULLTEXT KEY (Title, Body),
 		    
 			FOREIGN KEY (UserId) REFERENCES User (Id)
 				ON DELETE CASCADE,
