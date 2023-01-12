@@ -3,17 +3,67 @@ package controllers
 import (
 	"awesomeProject/database"
 	"awesomeProject/models"
+	sql2 "database/sql"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/gofiber/fiber/v2"
 	"math"
 	"strconv"
 	"time"
 )
 
-func activityBelongsToCurrentUser(userId uint, postId uint) (bool, error) {
+type ActivityJSON struct {
+	Id        int64      `json:"id"`
+	Title     string     `json:"title"`
+	Body      string     `json:"body"`
+	ClosedOn  *time.Time `json:"closed_on"`
+	OpenedOn  time.Time  `json:"opened_on"`
+	Due       *time.Time `json:"due"`
+	GroupId   *int64     `json:"group_id"`
+	GroupName *string    `json:"group_name"`
+}
+
+func (a *ActivityJSON) initJSON(activity models.Activity, groupName sql2.NullString) {
+	a.Id = activity.Id
+	a.Body = activity.Body
+	a.Title = activity.Title
+	a.OpenedOn = activity.OpenedOn
+
+	if activity.ClosedOn.Valid {
+		a.ClosedOn = new(time.Time)
+		println(activity.ClosedOn.Time.String())
+		*a.ClosedOn = activity.ClosedOn.Time
+	}
+
+	if activity.Due.Valid {
+		a.Due = new(time.Time)
+		*a.Due = activity.Due.Time
+	}
+
+	if activity.GroupId.Valid {
+		a.GroupId = new(int64)
+		*a.GroupId = activity.GroupId.Int64
+	}
+
+	if groupName.Valid {
+		a.GroupName = new(string)
+		*a.GroupName = groupName.String
+	}
+}
+
+func ActivityBelongsToCurrentUser(userId int64, activityId int64) (bool, error) {
 	var count int64
-	if err := database.DB.Raw("SELECT COUNT(*) FROM activities WHERE id = ? AND user_id = ?", postId, userId).Scan(&count).Error; err != nil {
-		return false, nil
+
+	println(activityId)
+	rows, err := database.DB.Query("SELECT COUNT(*) FROM Activity WHERE Id = ? AND UserId = ?", activityId, userId)
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+	rows.Next()
+	err = rows.Scan(&count)
+	if err != nil {
+		return false, err
 	}
 
 	return count != 0, nil
@@ -25,51 +75,39 @@ func CreateActivity(c *fiber.Ctx) error {
 		return c.SendStatus(401)
 	}
 
-	var data map[string]string
-	if err := c.BodyParser(&data); err != nil {
+	var json ActivityJSON
+	if err := c.BodyParser(&json); err != nil {
 		return c.Status(400).JSON(err.Error())
 	}
 
-	activity := models.Activity{
-		ActivityName:    data["name"],
-		ActivityContent: data["content"],
-		UserId:          userId,
-	}
-
-	if data["due"] != "" {
-		*activity.Due, _ = time.Parse(models.DataTimeFormat, data["due"])
-	} else {
-		activity.Due = nil
-	}
-
-	if err := database.DB.Exec("INSERT INTO activities(activity_name, activity_content, opened_on, due, user_id) VALUES (?, ?, NOW(), ?, ?)",
-		activity.ActivityName, activity.ActivityContent, activity.Due, userId).Error; err != nil {
+	stmt, err := database.DB.Prepare("INSERT INTO Activity (Title, Body, OpenedOn, Due, UserId, GroupId) VALUES (?, ?, ?, ?, ?, ?)")
+	if err != nil {
 		return c.Status(500).JSON(err.Error())
 	}
 
-	return c.Status(200).JSON("success")
-}
+	if json.GroupId != nil && *json.GroupId != 0 {
+		belongs, err := GroupBelongsToCurrentUser(userId, int64(*json.GroupId))
 
-func GetActivity(c *fiber.Ctx) error {
-	userId, err := GetCurrentUserId(c)
+		if err != nil {
+			return c.Status(500).JSON(err.Error())
+		}
 
+		if !belongs {
+			return c.Status(404).JSON("Cannot add an activity to a group that does not exits!")
+		}
+	}
+	json.OpenedOn = time.Now()
+	result, err := stmt.Exec(json.Title, json.Body, json.OpenedOn, json.Due, userId, json.GroupId)
 	if err != nil {
-		return c.Status(401).JSON(err.Error())
+		return c.Status(500).JSON(err.Error())
 	}
 
-	id, err := c.ParamsInt("id")
+	json.Id, err = result.LastInsertId()
 	if err != nil {
-		return c.Status(400).JSON(err.Error())
+		c.Status(500).JSON(err.Error())
 	}
 
-	var activity models.Activity
-	database.DB.Raw("SELECT * FROM activities WHERE id=? AND user_id=?", id, userId).Scan(&activity)
-
-	if activity.Id == 0 {
-		return c.SendStatus(404)
-	}
-
-	return c.SendStatus(200)
+	return c.Status(200).JSON(json)
 }
 
 func DeleteActivity(c *fiber.Ctx) error {
@@ -84,10 +122,19 @@ func DeleteActivity(c *fiber.Ctx) error {
 		return c.SendStatus(400)
 	}
 
-	status := database.DB.Exec("DELETE FROM activities WHERE id = ? AND user_id = ?", aId, userId)
+	stmt, err := database.DB.Prepare("DELETE FROM Activity WHERE Id = ? AND UserId = ?")
+	if err != nil {
+		return c.Status(500).JSON(err.Error())
+	}
 
-	if status.RowsAffected == 0 {
-		return c.SendStatus(404)
+	result, err := stmt.Exec(aId, userId)
+	if err != nil {
+		return c.Status(500).JSON(err.Error())
+	}
+
+	affected, _ := result.RowsAffected()
+	if affected == 0 {
+		return c.Status(404).JSON("Cannot delete an activity that does not exist!")
 	}
 
 	return c.SendStatus(200)
@@ -100,53 +147,99 @@ func UpdateActivity(c *fiber.Ctx) error {
 		c.SendStatus(401)
 	}
 
-	var data map[string]string
+	var json ActivityJSON
 
-	if err := c.BodyParser(&data); err != nil {
-		return c.SendStatus(400)
+	if err := c.BodyParser(&json); err != nil {
+		return c.Status(400).JSON(err.Error())
 	}
 
-	aId, err := c.ParamsInt("id")
+	belongs, err := ActivityBelongsToCurrentUser(userId, json.Id)
 	if err != nil {
-		return c.SendStatus(400)
+		return c.Status(500).JSON(err.Error())
+	} else if !belongs {
+		return c.Status(404).JSON("Activity does not exist!")
 	}
 
-	activityBelongs, err := activityBelongsToCurrentUser(userId, uint(aId))
-	if err != nil {
-		return c.SendStatus(500)
-	} else if !activityBelongs {
-		return c.SendStatus(404)
-	}
+	if json.GroupId != nil && *json.GroupId == 0 {
+		belongs, err := GroupBelongsToCurrentUser(userId, int64(*json.GroupId))
 
-	activity := models.Activity{
-		ActivityName:    data["name"],
-		ActivityContent: data["content"],
-	}
-	if data["label"] != "" {
-		labelId, _ := strconv.Atoi(data["label"])
-		labelBelongs, err := groupBelongsToCurrentUser(userId, uint(labelId))
 		if err != nil {
 			return c.Status(500).JSON(err.Error())
-		} else if !labelBelongs {
-			return c.SendStatus(404)
 		}
-		*activity.LabelId = uint(labelId)
-	} else {
-		activity.LabelId = nil
+
+		if !belongs {
+			return c.Status(404).JSON("Cannot add an activity to a group that does not exits!")
+		}
 	}
 
-	if err := database.DB.Exec("UPDATE activities SET activity_name=?, activity_content=?, label_id=? WHERE id = ? AND user_id = ?", activity.ActivityName, activity.ActivityContent, activity.LabelId, aId, userId).Error; err != nil {
-		return c.SendStatus(500)
+	stmt, err := database.DB.Prepare("UPDATE Activity SET Title = ?, Body = ?, Due = ?")
+	if err != nil {
+		return c.Status(500).JSON(err.Error())
 	}
+
+	_, err = stmt.Exec(json.Title, json.Body, json.Due)
+	if err != nil {
+		return c.Status(500).JSON(err.Error())
+	}
+
+	return c.Status(200).JSON(json)
+}
+
+// add or change the group of an activity
+func EditGroupActivity(c *fiber.Ctx) error {
+	userId, err := GetCurrentUserId(c)
 
 	if err != nil {
-		return c.SendStatus(500)
+		c.SendStatus(401)
+	}
+
+	var data map[string]int64
+	if err := c.BodyParser(&data); err != nil {
+		return c.Status(400).JSON("An error occurred while parsing JSON")
+	}
+
+	activityId, ok := data["activity_id"]
+	if !ok {
+		return c.Status(400).JSON("`activity_id` needs to be provided")
+	}
+
+	groupId, ok := data["group_id"]
+	if !ok {
+		return c.Status(400).JSON("`group_id` needs to be provided")
+	}
+
+	belongs, err := ActivityBelongsToCurrentUser(userId, activityId)
+	if err != nil {
+		return c.Status(500).JSON(err.Error())
+	} else if !belongs {
+		return c.Status(404).JSON("Activity does not exist!")
+	}
+
+	belongs, err = GroupBelongsToCurrentUser(userId, groupId)
+	if err != nil {
+		return c.Status(500).JSON(err.Error())
+	} else if !belongs {
+		return c.Status(404).JSON("Group does not exist!")
+	}
+
+	stmt, err := database.DB.Prepare("UPDATE Activity SET GroupId = ? WHERE Id = ?")
+	if err != nil {
+		return c.Status(500).JSON(err.Error())
+	}
+	_, err = stmt.Exec(groupId, activityId)
+	if err != nil {
+		return c.Status(500).JSON(err.Error())
 	}
 
 	return c.SendStatus(200)
 }
 
 func Activities(c *fiber.Ctx) error {
+	type userActivities struct {
+		User       models.User
+		Activities models.Activity
+	}
+
 	userId, err := GetCurrentUserId(c)
 
 	if err != nil {
@@ -155,29 +248,38 @@ func Activities(c *fiber.Ctx) error {
 
 	limit := 10
 	var count int64
-	if err := database.DB.Raw("SELECT COUNT(*) FROM activities WHERE user_id = ?", userId).Scan(&count).Error; err != nil {
-		println(err.Error())
-		return c.SendStatus(500)
+	rows, err := database.DB.Query("SELECT COUNT(*) FROM Activity WHERE UserId = ?", userId)
+	if err != nil {
+		return c.Status(500).JSON(err.Error())
 	}
+
+	rows.Next()
+	rows.Scan(&count)
+	rows.Close()
+
 	pages := int(math.Ceil(float64(count) / float64(limit)))
+	if pages < 1 {
+		pages = 1
+	}
 
 	startQ := c.Query("start", "1")
 	descQ := c.Query("desc", "true")
+	all := c.Query("all", "false")
 	search := c.Query("search", "")
 
-	// validate query params
+	//validate query params
 	start, err := strconv.Atoi(startQ)
 	if err != nil {
 		return c.SendStatus(400)
 	}
 
-	if start > pages {
-		start = pages
-	} else if start < 1 {
+	if start < 1 {
 		start = 1
+	} else if start > pages {
+		start = pages
 	}
 
-	// validate query params
+	//validate query params
 	desc, err := strconv.ParseBool(descQ)
 	if err != nil {
 		return c.SendStatus(400)
@@ -189,20 +291,40 @@ func Activities(c *fiber.Ctx) error {
 	} else {
 		order = "DESC"
 	}
-	var sql string
-	var activities []models.Activity
-	if search != "" {
-		sql = fmt.Sprintf("SELECT * FROM activities WHERE user_id = ? AND MATCH(activity_name) AGAINST(? IN NATURAL LANGUAGE MODE) ORDER BY closed_on %s LIMIT ? OFFSET ?", order)
-		if err := database.DB.Raw(sql, userId, search, limit, (start-1)*limit).Scan(&activities).Error; err != nil {
-			println(err.Error())
-			return c.SendStatus(500)
-		}
+
+	sql := `SELECT a.Id, a.Title, a.Body, a.ClosedOn, a.OpenedOn, a.Due, g.Id, g.Name
+		FROM Activity AS a
+		LEFT JOIN ActivityGroup AS g ON a.GroupId = g.Id
+		WHERE a.UserId = ? `
+
+	if all == "false" {
+		sql += fmt.Sprintf("AND MATCH(a.Title) AGAINST(? IN NATURAL LANGUAGE MODE) ORDER BY a.OpenedOn %s LIMIT ? OFFSET ?", order)
+		rows, err = database.DB.Query(sql, userId, search, limit, (start-1)*limit)
 	} else {
-		sql = fmt.Sprintf("SELECT * FROM activities WHERE user_id = ? ORDER BY closed_on %s LIMIT ? OFFSET ?", order)
-		if err := database.DB.Raw(sql, userId, limit, (start-1)*limit).Scan(&activities).Error; err != nil {
-			println(err.Error())
-			return c.SendStatus(500)
+		sql += fmt.Sprintf("ORDER BY a.OpenedOn %s LIMIT ? OFFSET ?", order)
+		rows, err = database.DB.Query(sql, userId, limit, (start-1)*limit)
+	}
+
+	defer rows.Close()
+
+	if err != nil {
+		return c.Status(500).JSON(err.Error())
+	}
+
+	var activities []ActivityJSON
+	for rows.Next() {
+		var activity models.Activity
+		var groupName sql2.NullString
+
+		err := rows.Scan(&activity.Id, &activity.Title, &activity.Body, &activity.ClosedOn, &activity.OpenedOn, &activity.Due, &activity.GroupId, &groupName)
+		if err != nil {
+			return c.Status(500).JSON(err.Error())
 		}
+
+		var activityJSON ActivityJSON
+		(&activityJSON).initJSON(activity, groupName)
+
+		activities = append(activities, activityJSON)
 	}
 
 	return c.Status(200).JSON(fiber.Map{
@@ -216,27 +338,31 @@ func Activities(c *fiber.Ctx) error {
 
 func CloseActivity(c *fiber.Ctx) error {
 	userId, err := GetCurrentUserId(c)
-
 	if err != nil {
-		c.SendStatus(401)
+		c.Status(401).JSON(err.Error())
 	}
 
 	aId, err := c.ParamsInt("id")
 	if err != nil {
-		return c.SendStatus(400)
+		return c.Status(400).JSON("Error while parsing params!")
 	}
 
-	belongs, err := activityBelongsToCurrentUser(userId, uint(aId))
+	belongs, err := ActivityBelongsToCurrentUser(userId, int64(aId))
 
 	if err != nil {
-		return c.SendStatus(500)
+		return c.Status(500).JSON(err.Error())
+	} else if !belongs {
+		return c.Status(403).JSON("Activity does not exist!")
 	}
 
-	if !belongs {
-		return c.SendStatus(403)
+	stmt, err := database.DB.Prepare("UPDATE Activity SET ClosedOn=NOW() WHERE Id = ? AND UserId = ?")
+	if err != nil {
+		return c.Status(500).JSON(err.Error())
 	}
-
-	database.DB.Exec("UPDATE activities SET closed_on=NOW() WHERE id=? AND user_id=?", aId, userId)
+	_, err = stmt.Exec(aId, userId)
+	if err != nil {
+		return c.Status(500).JSON(err.Error())
+	}
 
 	return c.SendStatus(200)
 }

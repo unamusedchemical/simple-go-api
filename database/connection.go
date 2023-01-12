@@ -1,24 +1,29 @@
 package database
 
 import (
-	"awesomeProject/models"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
+	"database/sql"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
+	"log"
+	"os"
 )
 
-var DB *gorm.DB
+var DB *sql.DB
 
 func Connect() {
-	connection, err := gorm.Open(mysql.Open("root:alekochoveko@/todo-app?parseTime=true"), &gorm.Config{})
+	err := godotenv.Load("/Users/alekogeorgiev/GolandProjects/todo-fiber/.env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	dbUser := os.Getenv("DB_USER")
+	dbPass := os.Getenv("DB_PASS")
+	dbName := os.Getenv("DB_NAME")
+
+	connection, err := sql.Open("mysql", dbUser+":"+dbPass+"@/"+dbName+"?parseTime=true")
 	if err != nil {
 		panic("could not connect to database")
 	}
-
 	DB = connection
 
-	connection.AutoMigrate(&models.User{})
-	connection.AutoMigrate(&models.Activity{})
-	connection.Exec("ALTER TABLE activities ADD FULLTEXT (activity_name)")
-	connection.AutoMigrate(&models.Label{})
-	connection.Exec("ALTER TABLE labels ADD FULLTEXT (name)")
 }
