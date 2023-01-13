@@ -19,22 +19,22 @@
 ## API routes
 - `localhost:8000/api/register` - register a new user
   -  JSON in the following format should be provided:
-```
-{
-  "username": "<username>",
-  "email": "<email>",
-  "password": "<password>"
-}
-```
+  ```
+  {
+    "username": "<username>",
+    "email": "<email>",
+    "password": "<password>"  
+  }
+  ```
 
 - `localhost:8000/api/login` - login
   -  JSON in the following format should be provided:
-```
-{
-  "email": "<email>",
-  "password": "<password>"
-}
-```
+  ```
+  {
+    "email": "<email>",
+    "password": "<password>"
+  } 
+  ```
 
 - `localhost:8000/api/user` - get logged in user
   - No JSON needs to be provided
@@ -49,4 +49,8 @@
     "password": "<password>"
   }
   ```
-- `localhost:`
+- `localhost:8000/api/activity/new`
+  - JSON in the following format should be provided:
+  ```
+  
+  ```
