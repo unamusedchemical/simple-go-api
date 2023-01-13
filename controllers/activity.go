@@ -260,7 +260,7 @@ func Activities(c *fiber.Ctx) error {
 	userId, err := GetCurrentUserId(c)
 
 	if err != nil {
-		c.SendStatus(401)
+		return c.Status(401).JSON("User is not logged in!")
 	}
 
 	limit := 10
