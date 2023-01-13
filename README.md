@@ -41,12 +41,12 @@
 
 - `localhost:8000/api/user/update` - update user with new credentials
   - JSON in the following format should be provided: 
-  ``
+  ```
   {
     "id":<id>,
     "username": "<username>",
     "email": "<email>",
     "password": "<password>"
   }
-  ``
+  ```
 - `localhost:`
