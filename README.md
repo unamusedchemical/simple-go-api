@@ -17,7 +17,8 @@
 - To run the app run `go run main.go`
 
 ## API routes
-- `localhost:8000/api/register` - register a new user, JSON in the following format should be provided:
+- `localhost:8000/api/register` - register a new user
+  -  JSON in the following format should be provided:
 `
 {
   "username": "<username>",
@@ -25,6 +26,26 @@
   "password": "<password>"
 }
 `
-  - 
 
-- `localhost:8000/api/login`
+- `localhost:8000/api/login` - login
+  -  JSON in the following format should be provided:
+`
+{
+  "email": "<email>",
+  "password": "<password>"
+}
+`
+
+- `localhost:8000/api/user` - get logged in user
+  - No JSON needs to be provided
+
+- `localhost:8000/api/user/update` - update user
+  - JSON in the following format should be provided: 
+  `
+  {
+    "id":<id>,
+    "username": "<username>",
+    "email": "<email>",
+    "password": "<password>"
+  }
+  `
