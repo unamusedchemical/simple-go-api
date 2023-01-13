@@ -1,2 +1,10 @@
 # todo-fiber
-<h2>A simple todo app with users and jwt authentication written in golang with the fiber framework</h2>
+
+
+<p>A simple todo app with jwt user authentication, written with golang and the fiber framework</p>
+
+## To run the app follow the steps listed below
+
+- Install the go language compiler from [here](https://go.dev/dl)
+- Setup your GOPATH (if you are using windows the installer might have automatically set it up for you)
+- Run 
