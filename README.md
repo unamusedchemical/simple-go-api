@@ -1,4 +1,4 @@
-# todo-fiber
+# 📋 ToDo App
 
 
 <p>A simple todo app with jwt user authentication, written with golang and the fiber framework</p>
