@@ -7,4 +7,5 @@
 
 - Install the go language compiler from [here](https://go.dev/dl)
 - Setup your GOPATH (if you are using windows the installer might have automatically set it up for you)
-- Run 
+- When the code is downloaded run `go mod tidy` to install all the dependencies
+- To compile and run, run `go 
