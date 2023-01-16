@@ -18,6 +18,7 @@
 
 ## API routes - once you have started the server, you can start interacting with it by sending and recieving HTTP requests on the following routes
 !NOTE - A pretty handy tool for testing APIs is [postman](https://www.postman.com)
+!NOTE - remove comments from JSON before making a request
 
 - `localhost:8000/api/register` - register a new user
   -  JSON in the following format should be provided:
@@ -70,7 +71,7 @@
     "id": <id>, // integer
     "title": "<title>",
     "body": "body",
-    "due": "<due>" // // should be in format "2006-12-11T12:55:23+02:00"
+    "due": "<due>" // should be in format "2006-12-11T12:55:23+02:00"
   }
   ```
   
