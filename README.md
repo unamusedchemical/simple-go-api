@@ -1,7 +1,7 @@
-# 📋 ToDo App
+# 📋 ToDo App - project for my DBMS class
 
 
-<p>A simple todo app with jwt user authentication, written with golang and the fiber framework</p>
+<p>A simple todo app API with jwt user authentication, written with golang and the fiber framework, using the go-sql-driver as an interface to a MySQL database.</p>
 
 ## Prerequisites
 - Install and configure MySQL server
@@ -16,7 +16,9 @@
   - `DB_NAME` - the name of the database that you created in the second step
 - To run the app run `go run main.go`
 
-## API routes
+## API routes - once you have started the server, you can start interacting with it by sending and recieving HTTP requests on the following routes
+!NOTE - A pretty handy tool for testing APIs is [postman](https://www.postman.com)
+
 - `localhost:8000/api/register` - register a new user
   -  JSON in the following format should be provided:
   ```
@@ -84,5 +86,35 @@
   }
   ```
   
-- `localhost:8000/api/activities` - get all activities and their groups
- 
+- `localhost:8000/api/activities?<key>=<value>` - get 10 activities and their groups, `A JOIN CLOSED IS USED HERE`
+  - The following URL parameters must be provided:
+    - `start` - as the data is paginated, `start` determines which set of 10 activities to get from the database, default value is `1`
+    - `desc` - if `desc=true`, the most recent posts will be shown first, if `desc=false`, the oldest posts are going to be first
+    - `all` - determines that nothing specific is being searched for, gets 10 activities from all available
+    - `search` - filters the activities by the value provided, activities containing data similar to the searched in their titles and bodies are returned
+    !NOTE - if both `all` and `search` are provided, the data returned is not going to be filtered by the search
+    
+- `localhost:8000/api/group/new` - create a new group
+  - JSON in the following format should be provided:
+  ```
+  {
+    "name": "<name>" // provide the name of the group
+  }
+  ```
+  
+- `localhost:8000/api/group/<id>/delete` - <id> is an integer value that indicates the group that is to be deleted
+
+- `localhost:8000/api/group/update` - updates a group
+  - JSON in the following format should be provided:
+  ```
+  {
+    "id": <group_id>, // id of the group to be updated
+    "name": "<name>" // new name of the group
+  }
+  ```
+  
+- `localhost:8000/api/group/<id>/get` - <id> is an integer value that indicates the group that is to be returned in the form of JSON; returns the group details and all activities related to it
+
+- `localhost:8000/api/group/<id>/delete` - <id> is an integer value that indicates the group that is to be deleted; deletes a group
+
+- `localhost:8000/api/groups` - returns all groups and their number of activities
