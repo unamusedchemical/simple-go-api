@@ -117,4 +117,4 @@
 
 - `localhost:8000/api/group/<id>/delete` - <id> is an integer value that indicates the group that is to be deleted; deletes a group
 
-- `localhost:8000/api/groups` - returns all groups and their activities
+- `localhost:8000/api/groups` - returns all groups and their number of activities
