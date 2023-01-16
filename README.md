@@ -1,4 +1,4 @@
-# 📋 ToDo App - a databases project for school
+# 📋 ToDo App - project for my DBMS class
 
 
 <p>A simple todo app API with jwt user authentication, written with golang and the fiber framework, using the go-sql-driver as an interface to a MySQL database.</p>
