@@ -43,14 +43,46 @@
   - JSON in the following format should be provided: 
   ```
   {
-    "id":<id>,
+    "id":<id>, // integer
     "username": "<username>",
     "email": "<email>",
     "password": "<password>"
   }
   ```
-- `localhost:8000/api/activity/new`
+  
+- `localhost:8000/api/activity/new` - create new activity
   - JSON in the following format should be provided:
   ```
-  
+  {
+    "title": "<title>",
+    "body": "<body>",
+    "due": "<due>", // should be in format "2006-12-11T12:55:23+02:00"
+    "group_id": <group_id> //integer or null
+  }
   ```
+  
+- `localhost:8000/api/activity/update` - update activity
+  - JSON in the following format should be provided:
+  ```
+  {
+    "id": <id>, // integer
+    "title": "<title>",
+    "body": "body",
+    "due": "<due>" // // should be in format "2006-12-11T12:55:23+02:00"
+  }
+  ```
+  
+- `localhost:8000/api/activity/<id>/delete` <id> is the integer value of the activity id - delete an activity
+  - No JSON needs to be provided
+  
+- `localhost:8000/api/activity/group` - add an activity to a group
+  - JSON in the following format should be provided:
+  ```
+  {
+    "activity_id": <id>, // integer
+    "group_id": <group_id> // integer
+  }
+  ```
+  
+- `localhost:8000/api/activities` - get all activities and their groups
+ 
