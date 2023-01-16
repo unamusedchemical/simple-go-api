@@ -20,7 +20,7 @@ func Setup(app *fiber.App) {
 	app.Get("/api/activities", controllers.Activities)
 	app.Post("/api/activity/:id/close", controllers.CloseActivity)
 	app.Post("/api/group/new", controllers.CreateGroup)
-	app.Post("/api/group/:id/update", controllers.UpdateGroup)
+	app.Post("/api/group/update", controllers.UpdateGroup)
 	app.Post("/api/group/:id/delete", controllers.DeleteGroup)
 	app.Post("/api/group/:id/get", controllers.GetGroup)
 	app.Post("/api/groups", controllers.GetGroups)
