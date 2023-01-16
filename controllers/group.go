@@ -85,13 +85,13 @@ func UpdateGroup(c *fiber.Ctx) error {
 		return c.Status(404).JSON("Group does not exist!")
 	}
 
-	stmt, err := database.DB.Prepare("UPDATE ActivityGroup SET Name = ? WHERE UserId = ?")
+	stmt, err := database.DB.Prepare("UPDATE ActivityGroup SET Name = ? WHERE UserId = ? AND Id = ?")
 	if err != nil {
 		println(err.Error())
 		return c.SendStatus(500)
 	}
 
-	_, err = stmt.Exec(group.Name, userId)
+	_, err = stmt.Exec(group.Name, userId, group.Id)
 	if err != nil {
 		println(err.Error())
 		return c.SendStatus(500)

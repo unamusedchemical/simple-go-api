@@ -252,11 +252,6 @@ func EditGroupActivity(c *fiber.Ctx) error {
 }
 
 func Activities(c *fiber.Ctx) error {
-	type userActivities struct {
-		User       models.User
-		Activities models.Activity
-	}
-
 	userId, err := GetCurrentUserId(c)
 
 	if err != nil {
