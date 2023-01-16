@@ -16,7 +16,8 @@
   - `DB_NAME` - the name of the database that you created in the second step
 - To run the app run `go run main.go`
 
-## API routes - once you have started the server, you can start interacting with it by sending and recieving JSON data, a good tool for testing such APIs is [postman](https://www.postman.com)
+## API routes - once you have started the server, you can start interacting with it by sending and recieving HTTP requests on the following routes
+!NOTE - A pretty handy tool in testing APIs is [postman](https://www.postman.com)
 
 - `localhost:8000/api/register` - register a new user
   -  JSON in the following format should be provided:
